@@ -3,6 +3,7 @@ name: Docker Image CI
 on:
   push:
     branches: [ "main" ]
+    tags: [ "*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -50,12 +51,12 @@ jobs:
       
       - name: Extract version from tag
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
       
       - name: Tag and push Docker image
         run: |
-          docker tag tailscale-mikrotik:latest ${{ github.repository_owner }}/tailscale-mikrotik:${{ steps.get_version.outputs.VERSION }}
-          docker tag tailscale-mikrotik:latest ${{ github.repository_owner }}/tailscale-mikrotik:latest
+          docker tag wojtekerbetowski/tailscale-mikrotik:latest ${{ github.repository_owner }}/tailscale-mikrotik:${{ steps.get_version.outputs.VERSION }}
+          docker tag wojtekerbetowski/tailscale-mikrotik:latest ${{ github.repository_owner }}/tailscale-mikrotik:latest
           
           docker push ${{ github.repository_owner }}/tailscale-mikrotik:${{ steps.get_version.outputs.VERSION }}
           docker push ${{ github.repository_owner }}/tailscale-mikrotik:latest
