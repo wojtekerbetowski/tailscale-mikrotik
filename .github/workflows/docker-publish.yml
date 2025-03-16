@@ -11,6 +11,7 @@ env:
   REGISTRY_DOCKERHUB: docker.io
   REGISTRY_GHCR: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  TAILSCALE_VERSION: v1.80.1
 
 jobs:
   build:
