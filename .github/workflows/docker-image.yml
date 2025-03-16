@@ -19,7 +19,7 @@ jobs:
       with:
         repository: tailscale/tailscale
         token: ${{ secrets.GITHUB_TOKEN }}
-        ref: 1.80.1
+        ref: v1.80.3
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag wojtekerbetowski/tailscale-mikrotik:latest
 
