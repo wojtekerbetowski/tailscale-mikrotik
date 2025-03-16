@@ -44,7 +44,8 @@ ENV VERSION_GIT_HASH=$VERSION_GIT_HASH
 ARG TARGETARCH
 
 # Build tailscale binaries with optimized flags and strip all symbols
-RUN GOARCH=$TARGETARCH CGO_ENABLED=0 go install -ldflags="-w -s \
+# Use -trimpath to remove file system paths from the resulting binary
+RUN GOARCH=$TARGETARCH CGO_ENABLED=0 go install -trimpath -ldflags="-w -s \
       -X tailscale.com/version.Long=$VERSION_LONG \
       -X tailscale.com/version.Short=$VERSION_SHORT \
       -X tailscale.com/version.GitCommit=$VERSION_GIT_HASH" \
@@ -53,23 +54,31 @@ RUN GOARCH=$TARGETARCH CGO_ENABLED=0 go install -ldflags="-w -s \
 # Apply maximum compression with UPX
 RUN upx --best --lzma /go/bin/tailscale && upx --best --lzma /go/bin/tailscaled
 
-# Use a minimal Alpine base image for the final stage
+# Create a minimal Alpine image for the final stage
 FROM alpine:3.20 AS runtime
 
-# Install only the essential packages in a single layer with minimal dependencies
-RUN apk add --no-cache --virtual .tailscale-deps \
+# Add labels for better identification
+LABEL org.opencontainers.image.title="Tailscale for MikroTik"
+LABEL org.opencontainers.image.description="Lightweight Tailscale container for MikroTik routers (<30MB)"
+LABEL org.opencontainers.image.source="https://github.com/fluent-networks/tailscale-mikrotik"
+LABEL org.opencontainers.image.vendor="Fluent Networks"
+
+# Install only the absolute minimum required packages in a single layer
+RUN apk add --no-cache \
     ca-certificates \
     iptables \
     ip6tables \
-    iproute2 \
-    && ln -sf /sbin/iptables-legacy /sbin/iptables \
-    && ln -sf /sbin/ip6tables-legacy /sbin/ip6tables \
-    # Clean up package cache and remove unnecessary files
-    && rm -rf /var/cache/apk/* \
-    # Remove unnecessary files to reduce image size
-    && rm -rf /usr/share/man /usr/share/doc /tmp/* /var/tmp/* \
+    iproute2-minimal \
+    && mkdir -p /dev/net \
+    && mknod /dev/net/tun c 10 200 \
+    && chmod 600 /dev/net/tun \
+    # Remove unnecessary files to reduce size
+    && rm -rf /usr/share/man /usr/share/doc /tmp/* /var/tmp/* /var/cache/apk/* \
+    && rm -rf /etc/init.d /etc/conf.d /etc/logrotate.d /etc/udhcpd \
+    && rm -rf /lib/firmware /lib/modules /media /mnt /opt /srv \
+    && rm -rf /usr/lib/modules-load.d /usr/lib/systemd /usr/lib/udev \
     # Strip binaries to reduce size
-    && find /sbin /usr/sbin -type f -exec strip --strip-all {} \; 2>/dev/null || true
+    && find /sbin /usr/sbin /bin /usr/bin -type f -exec strip --strip-all {} \; 2>/dev/null || true
 
 # Copy only the necessary binaries from the build stage
 COPY --from=build-env /go/bin/tailscale /go/bin/tailscaled /usr/local/bin/
@@ -82,7 +91,7 @@ RUN chmod +x /usr/local/bin/tailscale.sh
 RUN mkdir -p /var/run/tailscale /var/cache/tailscale /var/lib/tailscale
 
 # Set up the runtime environment
-ENV PATH="/usr/local/bin:${PATH}"
+ENV PATH="/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin"
 
 # Expose the tailscale port
 EXPOSE 41641/udp

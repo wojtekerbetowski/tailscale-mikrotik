@@ -1,19 +1,19 @@
 # Tailscale for MikroTik Container
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Docker Image Size](https://img.shields.io/badge/image%20size-<25MB-brightgreen)
+![Docker Image Size](https://img.shields.io/badge/image%20size-<30MB-brightgreen)
 ![Tailscale Version](https://img.shields.io/badge/Tailscale-v1.80.1-blue)
 ![Alpine Version](https://img.shields.io/badge/Alpine-3.20-blue)
 [![Docker Hub](https://img.shields.io/docker/pulls/wojtekerbetowski/tailscale-mikrotik.svg)](https://hub.docker.com/r/wojtekerbetowski/tailscale-mikrotik)
 
-A lightweight Docker container for running [Tailscale](https://tailscale.com) on [MikroTik RouterOS](https://mikrotik.com/software) devices with constrained storage. This project is specifically optimized for MikroTik routers with limited disk space, targeting an image size under 25MB.
+A lightweight Docker container for running [Tailscale](https://tailscale.com) on [MikroTik RouterOS](https://mikrotik.com/software) devices with constrained storage. This project is specifically optimized for MikroTik routers with limited disk space, targeting an image size under 30MB.
 
 ## Overview
 
 This project enables you to run Tailscale in MikroTik's Container environment, allowing your MikroTik router to join your Tailscale network and act as a subnet router. This provides secure access to devices on your local network through Tailscale's encrypted mesh network.
 
 **Key Features:**
-- Ultra-lightweight container (<25MB)
+- Ultra-lightweight container (<30MB)
 - Optimized for MikroTik routers with limited storage
 - Supports both Tailscale and Headscale control servers
 - Configurable via environment variables
@@ -30,7 +30,7 @@ The container image is available on the following registries:
 
 - **Tailscale**: v1.80.1 (February 2025)
 - **Base Image**: Alpine Linux 3.20
-- **Image Size**: ~24.5MB
+- **Image Size**: ~29MB
 
 ## Requirements
 
@@ -279,8 +279,19 @@ The container image has been optimized for minimal size while maintaining full f
 3. **Layer Optimization**: Dockerfile is structured to minimize layer size and number
 4. **Cleanup**: Unnecessary files and caches are removed during the build process
 5. **Alpine Base**: Uses Alpine Linux 3.20 as a lightweight base image
+6. **TUN Support**: Properly configured for TUN device support required by Tailscale
 
-These optimizations result in an image size under 25MB, making it ideal for devices with limited storage capacity.
+These optimizations result in an image size under 30MB, making it ideal for devices with limited storage capacity.
+
+## Running the Container
+
+When running the container, you need to provide the following capabilities and devices:
+
+```
+docker run --rm --cap-add=NET_ADMIN --device=/dev/net/tun tailscale-mikrotik
+```
+
+For MikroTik routers, these capabilities are automatically provided when running in container mode.
 
 ## Accessing the Container
 
