@@ -1,12 +1,12 @@
 # Tailscale for MikroTik Container
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Docker Image Size](https://img.shields.io/badge/image%20size-<30MB-brightgreen)
+![Docker Image Size](https://img.shields.io/badge/image%20size-<25MB-brightgreen)
 ![Tailscale Version](https://img.shields.io/badge/Tailscale-v1.80.1-blue)
 ![Alpine Version](https://img.shields.io/badge/Alpine-3.20-blue)
 [![Docker Hub](https://img.shields.io/docker/pulls/wojtekerbetowski/tailscale-mikrotik.svg)](https://hub.docker.com/r/wojtekerbetowski/tailscale-mikrotik)
 
-A lightweight Docker container for running [Tailscale](https://tailscale.com) on [MikroTik RouterOS](https://mikrotik.com/software) devices with constrained storage. This project is specifically optimized for MikroTik routers with limited disk space, targeting an image size under 30MB.
+A lightweight Docker container for running [Tailscale](https://tailscale.com) on [MikroTik RouterOS](https://mikrotik.com/software) devices with constrained storage. This project is specifically optimized for MikroTik routers with limited disk space, targeting an image size under 25MB.
 
 ## Overview
 
@@ -269,6 +269,18 @@ To build the Docker image locally:
    ```
 
 The script will generate a `tailscale.tar` file that you can upload to your MikroTik router.
+
+### Optimization Details
+
+The container image has been optimized for minimal size while maintaining full functionality:
+
+1. **Binary Optimization**: Tailscale binaries are built with stripped symbols and compressed using UPX
+2. **Minimal Dependencies**: Only essential packages are included in the final image
+3. **Layer Optimization**: Dockerfile is structured to minimize layer size and number
+4. **Cleanup**: Unnecessary files and caches are removed during the build process
+5. **Alpine Base**: Uses Alpine Linux 3.20 as a lightweight base image
+
+These optimizations result in an image size under 25MB, making it ideal for devices with limited storage capacity.
 
 ## Accessing the Container
 

@@ -30,17 +30,8 @@ RUN go mod download
 # Install UPX for binary compression
 RUN apk add --no-cache upx
 
-# Pre-build dependencies to leverage Docker cache
-RUN go install \
-    github.com/aws/aws-sdk-go-v2/aws \
-    github.com/aws/aws-sdk-go-v2/config \
-    gvisor.dev/gvisor/pkg/tcpip/adapters/gonet \
-    gvisor.dev/gvisor/pkg/tcpip/stack \
-    golang.org/x/crypto/ssh \
-    golang.org/x/crypto/acme \
-    github.com/coder/websocket \
-    github.com/mdlayher/netlink
-
+# Skip pre-building dependencies to reduce build time and layer size
+# Copy the source code
 COPY tailscale/. .
 
 # Build arguments for versioning
@@ -52,7 +43,7 @@ ARG VERSION_GIT_HASH=""
 ENV VERSION_GIT_HASH=$VERSION_GIT_HASH
 ARG TARGETARCH
 
-# Build tailscale binaries with optimized flags
+# Build tailscale binaries with optimized flags and strip all symbols
 RUN GOARCH=$TARGETARCH CGO_ENABLED=0 go install -ldflags="-w -s \
       -X tailscale.com/version.Long=$VERSION_LONG \
       -X tailscale.com/version.Short=$VERSION_SHORT \
@@ -62,10 +53,10 @@ RUN GOARCH=$TARGETARCH CGO_ENABLED=0 go install -ldflags="-w -s \
 # Apply maximum compression with UPX
 RUN upx --best --lzma /go/bin/tailscale && upx --best --lzma /go/bin/tailscaled
 
-# Use a smaller base image for the final stage
+# Use a minimal Alpine base image for the final stage
 FROM alpine:3.20 AS runtime
 
-# Install only the essential packages in a single layer
+# Install only the essential packages in a single layer with minimal dependencies
 RUN apk add --no-cache --virtual .tailscale-deps \
     ca-certificates \
     iptables \
@@ -73,8 +64,12 @@ RUN apk add --no-cache --virtual .tailscale-deps \
     iproute2 \
     && ln -sf /sbin/iptables-legacy /sbin/iptables \
     && ln -sf /sbin/ip6tables-legacy /sbin/ip6tables \
-    # Clean up package cache
-    && rm -rf /var/cache/apk/*
+    # Clean up package cache and remove unnecessary files
+    && rm -rf /var/cache/apk/* \
+    # Remove unnecessary files to reduce image size
+    && rm -rf /usr/share/man /usr/share/doc /tmp/* /var/tmp/* \
+    # Strip binaries to reduce size
+    && find /sbin /usr/sbin -type f -exec strip --strip-all {} \; 2>/dev/null || true
 
 # Copy only the necessary binaries from the build stage
 COPY --from=build-env /go/bin/tailscale /go/bin/tailscaled /usr/local/bin/

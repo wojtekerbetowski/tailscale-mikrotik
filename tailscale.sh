@@ -10,18 +10,22 @@ fi
 
 set -e
 
-# Enable IP forwarding
-echo 'Enabling IP forwarding...'
-if [ -w /etc/sysctl.d ]; then
-  echo 'net.ipv4.ip_forward = 1' > /etc/sysctl.d/99-tailscale.conf
-  echo 'net.ipv6.conf.all.forwarding = 1' >> /etc/sysctl.d/99-tailscale.conf
-  sysctl -p /etc/sysctl.d/99-tailscale.conf || echo "Warning: Could not apply sysctl settings"
+# Enable IP forwarding - requires root privileges
+if [ "$(id -u)" = "0" ]; then
+  echo 'Enabling IP forwarding...'
+  if [ -w /etc/sysctl.d ]; then
+    echo 'net.ipv4.ip_forward = 1' > /etc/sysctl.d/99-tailscale.conf
+    echo 'net.ipv6.conf.all.forwarding = 1' >> /etc/sysctl.d/99-tailscale.conf
+    sysctl -p /etc/sysctl.d/99-tailscale.conf || echo "Warning: Could not apply sysctl settings"
+  else
+    echo "Warning: /etc/sysctl.d is not writable, skipping IP forwarding configuration"
+  fi
 else
-  echo "Warning: /etc/sysctl.d is not writable, skipping IP forwarding configuration"
+  echo "Warning: Not running as root, skipping IP forwarding configuration"
 fi
 
-# Install routes if specified
-if [ -n "${ADVERTISE_ROUTES}" ]; then
+# Install routes if specified - requires root privileges
+if [ -n "${ADVERTISE_ROUTES}" ] && [ "$(id -u)" = "0" ]; then
   echo "Setting up routes: ${ADVERTISE_ROUTES}"
   # Use a more compatible syntax for reading the array
   OLD_IFS="$IFS"
@@ -33,6 +37,8 @@ if [ -n "${ADVERTISE_ROUTES}" ]; then
     fi
   done
   IFS="$OLD_IFS"
+elif [ -n "${ADVERTISE_ROUTES}" ]; then
+  echo "Warning: Not running as root, skipping route configuration"
 fi
 
 # Set login server for tailscale
