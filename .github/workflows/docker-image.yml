@@ -14,5 +14,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Checkout tailscale repository
+      uses: actions/checkout@v4
+      with:
+        repository: tailscale/tailscale
+        token: ${{ secrets.GITHUB_TOKEN }}
+        branch: 1.80.1
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
