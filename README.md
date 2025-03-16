@@ -4,6 +4,7 @@
 ![Docker Image Size](https://img.shields.io/badge/image%20size-<30MB-brightgreen)
 ![Tailscale Version](https://img.shields.io/badge/Tailscale-v1.80.1-blue)
 ![Alpine Version](https://img.shields.io/badge/Alpine-3.20-blue)
+[![Docker Hub](https://img.shields.io/docker/pulls/wojtekerbetowski/tailscale-mikrotik.svg)](https://hub.docker.com/r/wojtekerbetowski/tailscale-mikrotik)
 
 A lightweight Docker container for running [Tailscale](https://tailscale.com) on [MikroTik RouterOS](https://mikrotik.com/software) devices with constrained storage. This project is specifically optimized for MikroTik routers with limited disk space, targeting an image size under 30MB.
 
@@ -17,6 +18,13 @@ This project enables you to run Tailscale in MikroTik's Container environment, a
 - Supports both Tailscale and Headscale control servers
 - Configurable via environment variables
 - Automated upgrade script for RouterOS
+
+## Container Registries
+
+The container image is available on the following registries:
+
+- **Docker Hub**: `wojtekerbetowski/tailscale-mikrotik:0.1` or `wojtekerbetowski/tailscale-mikrotik:latest`
+- **GitHub Container Registry**: `ghcr.io/wojtekerbetowski/tailscale-mikrotik:latest`
 
 ## Current Version
 
@@ -94,15 +102,15 @@ add name="tailscale" src="/tailscale" dst="/var/lib/tailscale"
 
 You can deploy the container using one of the following methods:
 
-#### Option A: From Container Registry (Recommended)
+#### Option A: From Docker Hub (Recommended)
 
 ```
 # Configure registry
 /container/config 
-set registry-url=https://ghcr.io tmpdir=disk1/pull
+set registry-url=https://registry-1.docker.io tmpdir=disk1/pull
 
 # Add container
-/container add remote-image=fluent-networks/tailscale-mikrotik:latest \
+/container add remote-image=wojtekerbetowski/tailscale-mikrotik:latest \
   interface=veth1 \
   envlist=tailscale \
   root-dir=disk1/containers/tailscale \
@@ -112,7 +120,25 @@ set registry-url=https://ghcr.io tmpdir=disk1/pull
   dns=8.8.4.4,8.8.8.8
 ```
 
-#### Option B: Using Local Image File
+#### Option B: From GitHub Container Registry
+
+```
+# Configure registry
+/container/config 
+set registry-url=https://ghcr.io tmpdir=disk1/pull
+
+# Add container
+/container add remote-image=wojtekerbetowski/tailscale-mikrotik:latest \
+  interface=veth1 \
+  envlist=tailscale \
+  root-dir=disk1/containers/tailscale \
+  mounts=tailscale \
+  start-on-boot=yes \
+  hostname=mikrotik \
+  dns=8.8.4.4,8.8.8.8
+```
+
+#### Option C: Using Local Image File
 
 If you've built the image locally:
 
@@ -130,7 +156,7 @@ If you've built the image locally:
   dns=8.8.4.4,8.8.8.8
 ```
 
-#### Option C: For Routers Without External Storage
+#### Option D: For Routers Without External Storage
 
 For routers with limited internal storage:
 
