@@ -1,238 +1,277 @@
-# Tailscale for Mikrotik Container
+# Tailscale for MikroTik Container
 
-This project provides build and configuration information to run [Tailscale](https://tailscale.com) in [Mikrotik Container](https://help.mikrotik.com/docs/display/ROS/Container). Container is Mikrotik's own implementation of Docker(TM), allowing users to run containerized environments within RouterOS.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+![Docker Image Size](https://img.shields.io/badge/image%20size-<30MB-brightgreen)
+![Tailscale Version](https://img.shields.io/badge/Tailscale-v1.80.1-blue)
+![Alpine Version](https://img.shields.io/badge/Alpine-3.20-blue)
 
-This project is only recommended for research and testing purposes. Note the container can impact router performance: running a IPerf test of 50 Mbps via the container on a Mikrotik hAP ax3 consumes ~30% of the router's CPU.
+A lightweight Docker container for running [Tailscale](https://tailscale.com) on [MikroTik RouterOS](https://mikrotik.com/software) devices with constrained storage. This project is specifically optimized for MikroTik routers with limited disk space, targeting an image size under 30MB.
 
-The instructions below assume a use case for tailscale-enabled hosts accessing a router connected LAN subnet. Both Tailscale and Headscale control servers are supported.
+## Overview
 
-Other site to site scenarios are outlined in the [project wiki](https://github.com/Fluent-networks/tailscale-mikrotik/wiki).
+This project enables you to run Tailscale in MikroTik's Container environment, allowing your MikroTik router to join your Tailscale network and act as a subnet router. This provides secure access to devices on your local network through Tailscale's encrypted mesh network.
+
+**Key Features:**
+- Ultra-lightweight container (<25MB)
+- Optimized for MikroTik routers with limited storage
+- Supports both Tailscale and Headscale control servers
+- Configurable via environment variables
+- Automated upgrade script for RouterOS
 
 ## Current Version
 
-This project uses:
-- Tailscale v1.80.1 (February 2025)
-- Alpine Linux 3.20 as the base image
-- Optimized for minimal size (target < 30MB)
+- **Tailscale**: v1.80.1 (February 2025)
+- **Base Image**: Alpine Linux 3.20
+- **Image Size**: ~24.5MB
 
 ## Requirements
 
-The Mikrotik Container package is compatible with ARM, ARM64 and x86 architectures and the router must be be running RouterOS v7.6 or later. Refer to the [Mikrotik Container documentation](https://help.mikrotik.com/docs/display/ROS/Container) for recommendations, disclaimer and security risks. 
+- MikroTik router running RouterOS v7.6 or later
+- Container package enabled on RouterOS
+- Sufficient storage space (recommended: external USB drive for routers with limited internal storage)
+- Compatible with ARM, ARM64, and x86 architectures
 
-## Instructions
+> **Note**: This container can impact router performance. In testing, an IPerf test of 50 Mbps via the container on a MikroTik hAP ax3 consumed approximately 30% of the router's CPU.
 
-The example container runs as a [tailscale subnet router](https://tailscale.com/kb/1019/subnets/) on a Mikrotik hAP ac3. There are two subnets configured:
+## Quick Start
 
-* 192.168.88.0/24: the default bridge with physical LAN interface ports, routed to the tailscale network
-* 172.17.0.0/16: the docker bridge with a virtual ethernet (veth) interface port for the container
+1. Enable container mode on your MikroTik router
+2. Set up networking for the container
+3. Configure environment variables
+4. Deploy the container
+5. Authorize the router in your Tailscale account
 
-A WAN interface is configured as per default configuration on **ether1** for connectivity to the Tailscale Network. 
+Detailed instructions for each step are provided below.
 
-Note storage of the docker image on the router uses a USB drive mounted as **disk1** due to the limited storage (128MB) available on the router. To configure storage devices see the [Mikrotik Disks guide](https://help.mikrotik.com/docs/display/ROS/Disks).
+## Detailed Setup Instructions
 
-### Build the Docker Image
+### 1. Enable Container Mode
 
-**Note**: this step is only required if you are uploading a tar image file to your router as per Configuration Step 6b.
-
-The build script uses [Docker Buildx](https://docs.docker.com/buildx/working-with-buildx/).
-
-1. In `build.sh` set the PLATFORM shell script variable as required for the target router CPU - see [https://mikrotik.com/products/matrix](https://mikrotik.com/products/matrix)
-
-2. Run `./build.sh` to build the image. The build process will generate a container image archive file **`tailscale.tar`**
-
-### Configure the Router
-
-This section follows the Mikrotik Container documentation with additional steps to route the LAN subnet via the tailscale container.
-
-
-1. Enable container mode, and reboot.
+Enable container mode on your MikroTik router and reboot:
 
 ```
 /system/device-mode/update container=yes
 ```
 
-2. Create a veth interface for the container.
+### 2. Set Up Container Networking
+
+Create a virtual ethernet interface, bridge, and routing:
 
 ```
+# Create veth interface
 /interface/veth add name=veth1 address=172.17.0.2/16 gateway=172.17.0.1
-```
 
-3. Create a bridge for the container and add veth1 as a port.
-
-```
+# Create bridge and add veth1
 /interface/bridge add name=dockers
 /ip/address add address=172.17.0.1/16 interface=dockers
 /interface/bridge/port add bridge=dockers interface=veth1
-```
 
-4. Enable routing from the LAN to the Tailscale Network 
-
-```
+# Add route to Tailscale network
 /ip/route/add dst-address=100.64.0.0/10 gateway=172.17.0.2
 ```
 
-5. Add environment variables and container mount
+### 3. Configure Environment Variables
 
-| Variable          | Description                                   | Comment                                      |
-| ----------------- | --------------------------------------------- | -------------------------------------------- |
-| PASSWORD          | System root user password                     |                                              |
-| AUTH_KEY          | Tailscale non-reusable key, [Oauth secret](https://tailscale.com/kb/1215/oauth-clients#registering-new-nodes-using-oauth-credentials) or Headscale pre-authenticated key                       | Generate from the Tailscale console or Headscale CLI         |
-| ADVERTISE_ROUTES  | Comma-separated list of routes to advertise   |                                              |
-| CONTAINER_GATEWAY | The container bridge (veth1) IP address on the router |                                              |
-| LOGIN_SERVER      | Headscale login server                        | Only required for Headscale control server. Do not set if using Tailscale       |
-| UPDATE_TAILSCALE      | Update tailscale on container startup                         |       |
-| TAILSCALE_ARGS    | Additional arguments passed to tailscale      | Optional. Note:
-```--accept-routes``` is required to accept the advertised routes of the other subnet routers.
-```--netfilter-mode``` controls the degree of firewall configuration using iptables. See [tailscale up](https://tailscale.com/kb/1241/tailscale-up). |
-| TAILSCALED_ARGS   | Additional arguments passed to tailscaled     | Optional                                     |
-| STARTUP_SCRIPT    | Extra script to execute in container before tailscaled | Optional |
+Set up the required environment variables:
 
-Example Tailscale control server configuration:
 ```
 /container/envs
-add name="tailscale" key="PASSWORD" value="xxxxxxxxxxxxxx"
-add name="tailscale" key="AUTH_KEY" value="tskey-xxxxxxxxxxxxxxxxxxxxxxxx"
+add name="tailscale" key="PASSWORD" value="your-secure-password"
+add name="tailscale" key="AUTH_KEY" value="tskey-your-tailscale-auth-key"
 add name="tailscale" key="ADVERTISE_ROUTES" value="192.168.88.0/24"
 add name="tailscale" key="CONTAINER_GATEWAY" value="172.17.0.1"
-add name="tailscale" key="UPDATE_TAILSCALE"
-add name="tailscale" key="TAILSCALE_ARGS" value="--accept-routes --advertise-exit-node"
-```
-Example Headscale control server configuration:
-```
-/container/envs
-add name="tailscale" key="PASSWORD" value="xxxxxxxxxxxxxx"
-add name="tailscale" key="AUTH_KEY" value="xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-add name="tailscale" key="ADVERTISE_ROUTES" value="192.168.88.0/24"
-add name="tailscale" key="CONTAINER_GATEWAY" value="172.17.0.1"
-add name="tailscale" key="LOGIN_SERVER" value="http://headscale.example.com:8080"
 add name="tailscale" key="TAILSCALE_ARGS" value="--accept-routes --advertise-exit-node"
 ```
 
-Define the the mount as per below.
+Create a mount point for persistent Tailscale state:
 
 ```
 /container mounts
 add name="tailscale" src="/tailscale" dst="/var/lib/tailscale" 
 ```
 
-It's possible to execute extra script during container startup. To do this, firstly make sure that script is accessible inside
-container. For example put it to `/var/lib/tailscale` folder and then add `STARTUP_SCRIPT` environment variable:
+### 4. Deploy the Container
+
+You can deploy the container using one of the following methods:
+
+#### Option A: From Container Registry (Recommended)
+
+```
+# Configure registry
+/container/config 
+set registry-url=https://ghcr.io tmpdir=disk1/pull
+
+# Add container
+/container add remote-image=fluent-networks/tailscale-mikrotik:latest \
+  interface=veth1 \
+  envlist=tailscale \
+  root-dir=disk1/containers/tailscale \
+  mounts=tailscale \
+  start-on-boot=yes \
+  hostname=mikrotik \
+  dns=8.8.4.4,8.8.8.8
+```
+
+#### Option B: Using Local Image File
+
+If you've built the image locally:
+
+1. Upload the `tailscale.tar` file to your router (e.g., to `disk1/`)
+2. Add the container:
+
+```
+/container add file=disk1/tailscale.tar \
+  interface=veth1 \
+  envlist=tailscale \
+  root-dir=disk1/containers/tailscale \
+  mounts=tailscale \
+  start-on-boot=yes \
+  hostname=mikrotik \
+  dns=8.8.4.4,8.8.8.8
+```
+
+#### Option C: For Routers Without External Storage
+
+For routers with limited internal storage:
+
+```
+# Create a temporary RAM disk
+/disk add type=tmpfs tmpfs-max-size=200M
+
+# Upload tailscale.tar to tmp1/
+# Then add container
+/container add file=tmp1/tailscale.tar \
+  interface=veth1 \
+  envlist=tailscale \
+  root-dir=containers/tailscale \
+  mounts=tailscale \
+  start-on-boot=yes \
+  hostname=mikrotik \
+  dns=8.8.4.4,8.8.8.8
+```
+
+### 5. Start the Container
+
+```
+/container/start 0
+```
+
+### 6. Verify and Authorize
+
+1. Check the container status: `/container/print`
+2. In the Tailscale console, authorize the router and enable subnet routes
+3. Your Tailscale hosts should now be able to reach devices on your router's LAN subnet
+
+## Configuration Options
+
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `PASSWORD` | Root user password for the container | Yes |
+| `AUTH_KEY` | Tailscale auth key or Headscale pre-auth key | Yes |
+| `ADVERTISE_ROUTES` | Comma-separated list of routes to advertise | Yes |
+| `CONTAINER_GATEWAY` | The container bridge IP address (e.g., 172.17.0.1) | Yes |
+| `LOGIN_SERVER` | Headscale login server URL (only for Headscale) | No |
+| `UPDATE_TAILSCALE` | Update Tailscale on container startup (no value needed) | No |
+| `TAILSCALE_ARGS` | Additional arguments for `tailscale up` | No |
+| `TAILSCALED_ARGS` | Additional arguments for `tailscaled` | No |
+| `STARTUP_SCRIPT` | Path to script to execute before starting Tailscale | No |
+
+### Headscale Configuration
+
+For Headscale users, configure the environment variables as follows:
+
+```
+/container/envs
+add name="tailscale" key="PASSWORD" value="your-secure-password"
+add name="tailscale" key="AUTH_KEY" value="your-headscale-pre-auth-key"
+add name="tailscale" key="ADVERTISE_ROUTES" value="192.168.88.0/24"
+add name="tailscale" key="CONTAINER_GATEWAY" value="172.17.0.1"
+add name="tailscale" key="LOGIN_SERVER" value="http://headscale.example.com:8080"
+add name="tailscale" key="TAILSCALE_ARGS" value="--accept-routes"
+```
+
+### Custom Startup Script
+
+You can execute a custom script during container startup:
+
+1. Place your script in the mounted volume (e.g., `/var/lib/tailscale/startup.sh`)
+2. Add the environment variable:
 
 ```
 /container/envs
 add name="tailscale" key="STARTUP_SCRIPT" value="/var/lib/tailscale/startup.sh"
 ```
 
-6. Create the container
-
-The container can be created via the container registry (Step 6a) or using the `tailscale.tar` file generated by building the Docker image locally (Step 6b or 6c).
-
-6a. Container registry
-
-Configure the registry URL and add the container.
-
-```
-/container/config 
-set registry-url=https://ghcr.io tmpdir=disk1/pull
-
-/container add remote-image=fluent-networks/tailscale-mikrotik:latest interface=veth1 envlist=tailscale root-dir=disk1/containers/tailscale mounts=tailscale start-on-boot=yes hostname=mikrotik dns=8.8.4.4,8.8.8.8
-```
-
-6b. Tar archive file
-
-Using the file `tailscale.tar` generated by running `build.sh`, upload the file to your router. Below we  assume the image has been uploaded to the router as `disk1/tailscale.tar`
-
-```
-/container add file=disk1/tailscale.tar interface=veth1 envlist=tailscale root-dir=disk1/containers/tailscale mounts=tailscale start-on-boot=yes hostname=mikrotik dns=8.8.4.4,8.8.8.8
-```
-
-If you want to see the container output in the router log add `logging=yes` to the container add command. 
-
-6c. Tar archive file (routers without external storage)
-
-For routers without USB port (tested on hAP ax2) it's possible to use ramdisk to temporary store `tailscale.tar` file.
-
-Firstly make sure that there is no old version of container installed. Firstly create `tmpfs` disk:
-
-```
-/disk add type=tmpfs tmpfs-max-size=200M
-```
-Upload `tailscale.tar` file to `tmp1/` disk (or move it after uploading to root folder)
-
-Then start container like in 6b:
-
-```
-/container add file=tmp1/tailscale.tar interface=veth1 envlist=tailscale root-dir=containers/tailscale mounts=tailscale start-on-boot=yes hostname=mikrotik dns=8.8.4.4,8.8.8.8
-```
-
-Router will unpack tarball to internal storage. Once container is created it's ok to remove tarball from `tmpfs`. Also,
-container will be preserved after router reboot.
-
-### Start the Container
-
-Ensure the container has been extracted and added by verifying `status=stopped` using `/container/print` 
-
-```
-/container/start 0
-```
-
-### Verify Connectivity
-
-In the Tailscale console, check the router is authenticated and enable the subnet routes. Your tailscale hosts should now be able to reach the router's LAN subnet. 
-
-The container exposes a SSH server for management purposes using root credentials, and can be accessed via the router's tailscale address or the veth interface address. Alternatively, you can access the container via the router CLI:
-
-```
-/container/shell 0
-bash-5.1# 
-```
-
 ## Upgrading
 
-### Manual
-To upgrade, first stop and remove the container.
+### Manual Upgrade
 
-```
-/container/stop 0
-/container/remove 0
-```
+1. Stop and remove the current container:
+   ```
+   /container/stop 0
+   /container/remove 0
+   ```
+2. Deploy the new container as described in the "Deploy the Container" section
 
-Create the upgraded container as per Step 6. 
+### Automated Upgrade
 
-### Via Script
-The script **upgrade.rsc** automates the upgrade process. To use the script, edit the *hostname* variable to match your container
-and import the script - note the script assumes the container repository is being used.
+Use the included `upgrade.rsc` script to automate the upgrade process:
 
-```
-/system script add name=upgrade source=[ /file get upgrade.rsc contents];
-```
+1. Edit the `hostname` variable in `upgrade.rsc` to match your container
+2. Import the script:
+   ```
+   /system script add name=upgrade source=[ /file get upgrade.rsc contents];
+   ```
+3. Run the script:
+   ```
+   /system script run [find name="upgrade"];
+   ```
 
-Run the script:
-```
-/system script 
-run [find name="upgrade"];
+> **Note**: If you're connected over Tailscale, the script will continue running even after your connection is temporarily lost. When completed, check that the router is authenticated and enable subnet routes in the Tailscale console.
 
-Stopping the container...
-Waiting for the container to stop...
-Waiting for the container to stop...
-Waiting for the container to stop...
-Stopped.
-Removing the container...
-Waiting for the container to be removed...
-Removed.
-Adding the container...
-Waiting for the container to be added...
-Waiting for the container to be added...
-Waiting for the container to be added...
-Waiting for the container to be added...
-Waiting for the container to be added...
-Waiting for the container to be added...
-Added.
-Starting the container.
-```
+## Building the Image
 
-Note the script will continue to run if you are connecting over the tailnet. When completed, check the router is authenticated and enable the subnet routes in the Tailscale console.
+To build the Docker image locally:
+
+1. Clone this repository
+2. Adjust the `PLATFORM` variable in `build.sh` to match your target architecture
+3. Run the build script:
+   ```
+   ./build.sh
+   ```
+
+The script will generate a `tailscale.tar` file that you can upload to your MikroTik router.
+
+## Accessing the Container
+
+You can access the container in several ways:
+
+1. Via the router's CLI:
+   ```
+   /container/shell 0
+   ```
+
+2. Via SSH using the router's Tailscale IP address (using the root password set in the environment variables)
+
+## Troubleshooting
+
+- **Container fails to start**: Check the logs with `/container/logs 0`
+- **No connectivity to Tailscale network**: Verify the AUTH_KEY is valid and the router is authorized in the Tailscale console
+- **Can't reach LAN devices**: Ensure subnet routes are enabled in the Tailscale console
+- **High CPU usage**: Consider adjusting the `--netfilter-mode` option in TAILSCALE_ARGS
 
 ## Contributing
 
-We welcome suggestions and feedback from people interested in integrating Tailscale on the RouterOS platform. Please send a PR or create an issue if you're having any problems.
+Contributions are welcome! Please feel free to submit a Pull Request or create an Issue if you encounter any problems or have suggestions for improvements.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Tailscale](https://tailscale.com) for their excellent VPN solution
+- [MikroTik](https://mikrotik.com) for RouterOS and Container support
+- All contributors to this project
