@@ -1,0 +1,23 @@
+# Build artifacts
+*.tar
+
+# Tailscale source code (cloned during build)
+tailscale/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.log
+tmp/
+
+# Docker related
+.docker/
