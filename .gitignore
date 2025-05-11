@@ -21,3 +21,8 @@ tmp/
 
 # Docker related
 .docker/
+
+**/.claude/settings.local.json
+
+# Binary files
+**/main
