@@ -132,6 +132,88 @@ Recommended RouterOS-specific args:
 /container/envs/remove [find where name="tailscale" and key="TS_AUTH_KEY"]
 ```
 
+## Quick deploy to another router
+
+Follow these steps to bring up the same setup on another MikroTik (RouterOS 7.14+), with minimal writes to flash.
+
+### 1) Prepare networking on the router
+
+Adjust IPs as needed. Example uses `veth-tailscale` at `172.17.0.2/24` with gateway `172.17.0.1` and a bridge `dockers`.
+
+```routeros
+# Create veth and bridge (if not already present)
+/interface/veth/add name=veth-tailscale address=172.17.0.2/24 gateway=172.17.0.1
+/interface/bridge/add name=dockers
+/interface/bridge/port/add bridge=dockers interface=veth-tailscale
+
+# Route for Tailscale control plane & relays
+/ip/route/add dst-address=100.64.0.0/10 gateway=172.17.0.2
+```
+
+### 2) Create directories and copy artifacts
+
+```routeros
+# Ensure persistent directories exist
+:if ([:len [/file find where name="containers"]] = 0) do={ /file add name="containers" type=directory }
+:if ([:len [/file find where name="containers/tailscale"]] = 0) do={ /file add name="containers/tailscale" type=directory }
+```
+
+From your workstation (repo root):
+
+```bash
+scp tailscale-arm64.tar admin@<ROUTER_IP>:containers/tailscale/
+scp tailscale-boot.rsc admin@<ROUTER_IP>:containers/tailscale/
+```
+
+### 3) Configure env list (steady state)
+
+```routeros
+# Required keys for ongoing operation
+/container/envs/add name=tailscale key=ADVERTISE_ROUTES value=192.168.92.0/22
+/container/envs/add name=tailscale key=CONTAINER_GATEWAY value=172.17.0.1
+/container/envs/add name=tailscale key=TAILSCALE_ARGS value="--accept-routes --advertise-exit-node --netfilter-mode=off"
+
+# Optional: one-time auth for first bring-up only (remove after success)
+# /container/envs/add name=tailscale key=AUTH_KEY value=tskey-xxxxx
+```
+
+### 4) Use RAM for container layers
+
+```routeros
+/container/config/set layer-dir=tmpfs tmpdir=tmpfs/pull ram-high=200M
+```
+
+### 5) Add startup scheduler and run once
+
+```routeros
+/system/scheduler/add name=start-ts on-event="/import file-name=containers/tailscale/tailscale-boot.rsc" start-time=startup
+/import file-name=containers/tailscale/tailscale-boot.rsc
+```
+
+The import will ensure the state mount exists, (re)add the container from the tar if missing, and start it.
+
+### 6) Verify and clean up auth keys
+
+```routeros
+/container/print detail where hostname="mikrotik-tailscale"
+/log/print where topics~"container" time>[:totime "now-5m"]
+/ping address=100.100.100.100 count=2
+
+# After successful auth, remove one-time keys if you used them:
+# /container/envs/remove [find where name="tailscale" and key="AUTH_KEY"]
+# /container/envs/remove [find where name="tailscale" and key="TS_AUTH_KEY"]
+```
+
+### 7) Reboot test
+
+```routeros
+/system/reboot
+# After boot
+/container/print detail where hostname="mikrotik-tailscale"
+/ip/route/print where dst-address=100.64.0.0/10
+/ping address=100.100.100.100 count=2
+```
+
 ## Useful Commands
 
 ### Network Configuration
