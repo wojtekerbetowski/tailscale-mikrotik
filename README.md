@@ -91,6 +91,47 @@ scp tailscale-arm64.tar admin@192.168.88.1:tmp1/
     logging=yes
 ```
 
+## Persistence on Reboot (MikroTik)
+
+To make Tailscale survive reboots without exhausting flash storage:
+
+- Ensure the image tar is stored in persistent storage at `containers/tailscale/tailscale-arm64.tar` on the router.
+- Copy the boot script to the same directory:
+
+```bash
+scp tailscale-boot.rsc admin@<ROUTER_IP>:containers/tailscale/
+scp tailscale-arm64.tar admin@<ROUTER_IP>:containers/tailscale/
+```
+
+- Configure the container subsystem to use RAM for layers (prevents "No space left" and reduces flash wear):
+
+```routeros
+/container/config/set layer-dir=tmpfs tmpdir=tmpfs/pull ram-high=200M
+```
+
+- Create a startup scheduler that imports the boot script on every boot:
+
+```routeros
+/system/scheduler/add name=start-ts on-event="/import file-name=containers/tailscale/tailscale-boot.rsc" start-time=startup
+```
+
+What the boot script does on boot:
+
+- Ensures the `tmpfs` layer and pull dirs are set
+- Ensures `containers/tailscale/state` exists and is mounted as `tailscale_state` to `/var/lib/tailscale`
+- Re-adds the container from `containers/tailscale/tailscale-arm64.tar` if missing
+- Starts the container
+
+Recommended RouterOS-specific args:
+
+- Add `--netfilter-mode=off` to `TAILSCALE_ARGS` to avoid iptables/ip6tables errors on MikroTik kernels and rely on RouterOS firewalling instead.
+- After successful auth, remove one-time auth envs to avoid re-logins:
+
+```routeros
+/container/envs/remove [find where name="tailscale" and key="AUTH_KEY"]
+/container/envs/remove [find where name="tailscale" and key="TS_AUTH_KEY"]
+```
+
 ## Useful Commands
 
 ### Network Configuration
