@@ -17,12 +17,13 @@ else
     git -c advice.detachedHead=false clone https://github.com/tailscale/tailscale.git --branch v$TAILSCALE_VERSION --depth 1
 fi
 
-# Build the Docker image with standard Docker
-echo "Building optimized container image for ARM64..."
-docker build \
+# Build the Docker image with buildx to ensure arm64 base
+echo "Building optimized container image for ARM64 (buildx)..."
+docker buildx build \
+  --platform linux/arm64 \
   --build-arg TAILSCALE_VERSION=$TAILSCALE_VERSION \
   --build-arg TARGETARCH=arm64 \
-  -t tailscale-mikrotik-arm64:latest .
+  --load -t tailscale-mikrotik-arm64:latest .
 
 echo "Saving container image to tailscale-arm64.tar..."
 docker save -o tailscale-arm64.tar tailscale-mikrotik-arm64:latest

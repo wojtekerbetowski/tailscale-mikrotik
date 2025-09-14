@@ -10,19 +10,18 @@ fi
 
 set -e
 
-# Ensure TUN device exists
+# Ensure TUN device exists (best-effort)
 if [ ! -e /dev/net/tun ]; then
-  echo "Creating TUN device..."
-  mkdir -p /dev/net
-  mknod /dev/net/tun c 10 200
-  chmod 600 /dev/net/tun
+  echo "Creating TUN device (best-effort)..."
+  mkdir -p /dev/net || true
+  mknod /dev/net/tun c 10 200 2>/dev/null || echo "Warning: Could not create /dev/net/tun; ensure host provides it"
+  chmod 600 /dev/net/tun 2>/dev/null || true
 fi
 
-# Verify iptables is available
+# Verify iptables availability (warn only on MikroTik; netfilter-mode may be off)
 if ! command -v iptables >/dev/null 2>&1; then
-  echo "ERROR: iptables not found in PATH"
+  echo "Warning: iptables not found in PATH (ok if --netfilter-mode=off)"
   echo "Current PATH: $PATH"
-  exit 1
 fi
 
 # Enable IP forwarding - requires root privileges
@@ -119,14 +118,15 @@ if [ -n "${AUTH_KEY}" ]; then
     --authkey="${AUTH_KEY}" \
     --login-server "${LOGIN_SERVER}" \
     ${ADVERTISE_ROUTES:+--advertise-routes="${ADVERTISE_ROUTES}"} \
-    ${TAILSCALE_ARGS}
+    ${TAILSCALE_ARGS} || echo "Warning: tailscale up with AUTH_KEY returned non-zero; continuing"
 else
   # Interactive login if no auth key
+  # If state already exists, this should be idempotent. Ignore failure to avoid exit.
   /usr/local/bin/tailscale up \
     --reset \
     --login-server "${LOGIN_SERVER}" \
     ${ADVERTISE_ROUTES:+--advertise-routes="${ADVERTISE_ROUTES}"} \
-    ${TAILSCALE_ARGS}
+    ${TAILSCALE_ARGS} || echo "Warning: tailscale up returned non-zero (likely awaiting interactive auth); continuing"
 fi
 
 echo "Tailscale started successfully!"
