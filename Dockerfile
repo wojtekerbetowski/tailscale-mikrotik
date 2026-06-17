@@ -69,16 +69,19 @@ RUN apk add --no-cache \
     iptables \
     ip6tables \
     iproute2-minimal \
+    binutils \
     && mkdir -p /dev/net \
-    && mknod /dev/net/tun c 10 200 \
-    && chmod 600 /dev/net/tun \
+    && mknod /dev/net/tun c 10 200 2>/dev/null || true \
+    && chmod 600 /dev/net/tun 2>/dev/null || true \
+    # Strip binaries to reduce size (best-effort)
+    && find /sbin /usr/sbin /bin /usr/bin -type f -exec strip --strip-all {} \; 2>/dev/null || true \
+    # Remove strip tool to avoid keeping it in final image
+    && apk del --no-cache binutils \
     # Remove unnecessary files to reduce size
     && rm -rf /usr/share/man /usr/share/doc /tmp/* /var/tmp/* /var/cache/apk/* \
     && rm -rf /etc/init.d /etc/conf.d /etc/logrotate.d /etc/udhcpd \
     && rm -rf /lib/firmware /lib/modules /media /mnt /opt /srv \
-    && rm -rf /usr/lib/modules-load.d /usr/lib/systemd /usr/lib/udev \
-    # Strip binaries to reduce size
-    && find /sbin /usr/sbin /bin /usr/bin -type f -exec strip --strip-all {} \; 2>/dev/null || true
+    && rm -rf /usr/lib/modules-load.d /usr/lib/systemd /usr/lib/udev
 
 # Copy only the necessary binaries from the build stage
 COPY --from=build-env /go/bin/tailscale /go/bin/tailscaled /usr/local/bin/
@@ -96,5 +99,5 @@ ENV PATH="/usr/local/bin:/usr/bin:/bin:/sbin:/usr/sbin"
 # Expose the tailscale port
 EXPOSE 41641/udp
 
-# Set the entrypoint
-ENTRYPOINT ["/usr/local/bin/tailscale.sh"]
+# Set the default command (RouterOS container uses CMD)
+CMD ["/usr/local/bin/tailscale.sh"]

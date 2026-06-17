@@ -10,6 +10,16 @@ fi
 
 set -e
 
+# Log to persistent state directory if available
+LOG_DIR="/var/lib/tailscale"
+LOG_FILE="$LOG_DIR/startup.log"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+if [ -w "$LOG_DIR" ]; then
+  # Prepend timestamp and redirect stdout/stderr to log file (POSIX-safe)
+  echo "$(date -Iseconds) tailscale.sh starting" >> "$LOG_FILE" 2>/dev/null || true
+  exec >> "$LOG_FILE" 2>&1
+fi
+
 # Ensure TUN device exists (best-effort)
 if [ ! -e /dev/net/tun ]; then
   echo "Creating TUN device (best-effort)..."
@@ -103,11 +113,16 @@ cat /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null || echo "Cannot read IPv6
 
 # Start tailscaled
 echo "Starting tailscaled..."
-/usr/local/bin/tailscaled --state=/var/lib/tailscale/tailscaled.state ${TAILSCALED_ARGS} &
+/usr/local/bin/tailscaled --state=/var/lib/tailscale/tailscaled.state ${TAILSCALED_ARGS} >>"$LOG_FILE" 2>&1 &
 TAILSCALED_PID=$!
 
 # Wait for tailscaled to start
-sleep 1
+sleep 2
+
+# If tailscaled exited early, dump a hint to the log
+if ! kill -0 "$TAILSCALED_PID" 2>/dev/null; then
+  echo "tailscaled exited early; see $LOG_FILE for details" >&2
+fi
 
 # Bring tailscale up
 echo "Bringing tailscale up..."
