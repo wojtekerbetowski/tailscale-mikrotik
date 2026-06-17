@@ -19,7 +19,7 @@
 #
 ############################################################################
 
-FROM golang:1.25-alpine AS build-env
+FROM golang:1.26-alpine AS build-env
 
 WORKDIR /go/src/tailscale
 
@@ -46,9 +46,8 @@ ARG TARGETARCH
 # Build tailscale binaries with optimized flags and strip all symbols
 # Use -trimpath to remove file system paths from the resulting binary
 RUN GOARCH=$TARGETARCH CGO_ENABLED=0 go install -trimpath -ldflags="-w -s \
-      -X tailscale.com/version.Long=$VERSION_LONG \
-      -X tailscale.com/version.Short=$VERSION_SHORT \
-      -X tailscale.com/version.GitCommit=$VERSION_GIT_HASH" \
+      -X tailscale.com/version.longStamp=$VERSION_LONG \
+      -X tailscale.com/version.shortStamp=$VERSION_SHORT" \
       -v ./cmd/tailscale ./cmd/tailscaled
 
 # Apply maximum compression with UPX

@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Build script for ARM64 Tailscale MikroTik container
 
-TAILSCALE_VERSION=1.88.1
+TAILSCALE_VERSION=1.98.5
 VERSION=0.1.40
 
 set -eu
