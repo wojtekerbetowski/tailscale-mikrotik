@@ -22,8 +22,15 @@ docker build \
   --build-arg TARGETARCH=arm64 \
   -t tailscale-mikrotik-arm64:latest .
 
-echo "Saving container image to tailscale-arm64.tar..."
-docker save -o tailscale-arm64.tar tailscale-mikrotik-arm64:latest
+echo "Saving container image..."
+docker save -o tailscale-arm64.oci.tar tailscale-mikrotik-arm64:latest
+
+# RouterOS cannot import gzip-compressed OCI layers that modern Docker
+# (BuildKit / containerd image store) produces. Repack with uncompressed
+# layers so `/container/add` does not fail with "failed to load next entry".
+echo "Repacking image for RouterOS compatibility..."
+python3 pack-for-routeros.py tailscale-arm64.oci.tar tailscale-arm64.tar
+rm -f tailscale-arm64.oci.tar
 
 # Get the actual image size
 IMAGE_SIZE=$(docker images tailscale-mikrotik-arm64:latest --format "{{.Size}}")
