@@ -17,18 +17,20 @@ else
     git -c advice.detachedHead=false clone https://github.com/tailscale/tailscale.git --branch v$TAILSCALE_VERSION --depth 1
 fi
 
-# Obtain Tailscale version variables for embedding into binaries
-echo "Preparing Tailscale build metadata..."
-TS_USE_TOOLCHAIN="Y"
-VERSION_LONG=""
-VERSION_SHORT=""
-VERSION_GIT_HASH=""
-if (cd tailscale && ./build_dist.sh shellvars >/dev/null 2>&1); then
-  eval $(cd tailscale && ./build_dist.sh shellvars)
-  echo "Version metadata: long=${VERSION_LONG}, short=${VERSION_SHORT}, git=${VERSION_GIT_HASH}"
-else
-  echo "Warning: Could not obtain shellvars from build_dist.sh; continuing without embedded version metadata"
-fi
+# Obtain Tailscale version variables for embedding into binaries.
+# Runs inside golang:1.26-alpine so the host does not need Go or git installed,
+# and the result is identical across machines.
+echo "Preparing Tailscale build metadata (in golang:1.26-alpine)..."
+SHELLVARS=$(docker run --rm \
+  -v "$PWD/tailscale:/src" \
+  -w /src \
+  golang:1.26-alpine sh -c '
+    apk add --no-cache git >/dev/null 2>&1
+    git config --global --add safe.directory /src
+    ./build_dist.sh shellvars
+  ')
+eval "$SHELLVARS"
+echo "Version metadata: long=${VERSION_LONG}, short=${VERSION_SHORT}, git=${VERSION_GIT_HASH}"
 
 echo "Building optimized container image for ARM64..."
 if docker buildx version >/dev/null 2>&1; then
