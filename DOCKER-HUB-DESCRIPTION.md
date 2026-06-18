@@ -1,20 +1,22 @@
 # Tailscale for MikroTik Container
 
-A lightweight Docker container for running [Tailscale](https://tailscale.com) on [MikroTik RouterOS](https://mikrotik.com/software) devices with constrained storage. This project is specifically optimized for MikroTik routers with limited disk space, targeting an image size under 30MB.
+A lightweight Docker container for running [Tailscale](https://tailscale.com) on [MikroTik RouterOS](https://mikrotik.com/software) devices with constrained storage. This project is specifically optimized for MikroTik routers with limited disk space.
 
 ## Features
 
-- **Ultra-lightweight**: Container size is less than 25MB
-- **Optimized for MikroTik routers**: Designed for devices with limited storage
-- **Tailscale v1.80.1**: Latest version of Tailscale (as of February 2025)
-- **Alpine Linux 3.20**: Minimal base image for security and size
+- **Lightweight**: Compressed image is ~31 MB on disk (32 MB when imported)
+- **arm64 only**: Built for MikroTik routers with arm64 CPUs (e.g. hAP ax²). The image will not run on amd64 / mipsbe hardware.
+- **Tailscale v1.98.5**: Built from upstream source with proper version stamps (no `-ERR-BuildInfo`)
+- **Go 1.26 / Alpine Linux 3.20**: Minimal base image for security and size
+- **RouterOS-ready**: Image artifact (`tailscale-arm64.tar` from GitHub releases / workflow artifacts) ships with uncompressed layers so `/container/add` imports cleanly on modern Docker outputs
 - **Configurable**: Easily configurable via environment variables
 - **Dual Control Server Support**: Works with both Tailscale and Headscale control servers
 
 ## Tags
 
-- `latest`: The most recent build
-- `0.1`: First stable release with Tailscale v1.80.1 and Alpine 3.20
+- `latest`: The most recent release
+- `0.5`: Tailscale 1.98.5, arm64, version-stamped binary, RouterOS-ready tar
+- `0.4`, `0.3`, `0.2`, `0.1`: Historical amd64 builds with Tailscale 1.80.x (not usable on MikroTik hardware — kept for reference only)
 
 ## Usage
 
